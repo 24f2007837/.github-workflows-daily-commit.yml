@@ -1,0 +1,47 @@
+name: Daily commit (DevSync AutoUpdate)
+
+# Run once per day at a specific hour+minute (UTC). Example below runs at 02:15 UTC daily.
+on:
+  schedule:
+    - cron: '15 2 * * *'        # runs daily at 02:15 UTC (minute hour day month weekday)
+  workflow_dispatch:           # allows manual trigger from Actions UI for testing
+
+# Ensure the workflow has permission to write repository contents
+permissions:
+  contents: write
+
+jobs:
+  daily-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git (author email: 24f2007837@ds.study.iitm.ac.in)
+        run: |
+          git config user.name "DevSync Automaton"
+          git config user.email "24f2007837@ds.study.iitm.ac.in"
+
+      - name: Append timestamp to daily-commit log to create a change
+        run: |
+          # ensure directory exists
+          mkdir -p .github/auto-commits
+          # append an ISO UTC timestamp to the log file so each run makes a change
+          echo "Daily update: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> .github/auto-commits/daily-commit-log.txt
+          # show last line for logs
+          tail -n 1 .github/auto-commits/daily-commit-log.txt
+
+      - name: Add and commit changes
+        run: |
+          git add .github/auto-commits/daily-commit-log.txt
+          # Use a consistent commit message
+          git commit -m "chore(daily): automated daily commit $(date -u +"%Y-%m-%dT%H:%M:%SZ")" || echo "No changes to commit"
+
+      - name: Push commit to repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Push back to the branch that triggered the workflow
+          git push origin HEAD:${{ github.ref_name }}
